@@ -38,7 +38,10 @@ def init_schema(conn) -> None:
           note TEXT,
           created_at TEXT NOT NULL,
           applied_at TEXT,
-          apply_batch_id INTEGER
+          apply_batch_id INTEGER,
+          voided_at TEXT,
+          void_reason TEXT,
+          void_count INTEGER NOT NULL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS price_ticket_lines (
           id INTEGER PRIMARY KEY,
@@ -69,8 +72,22 @@ def init_schema(conn) -> None:
           price REAL NOT NULL,
           source_ticket_no TEXT,
           effective_at TEXT NOT NULL,
-          recorded_at TEXT NOT NULL
+          recorded_at TEXT NOT NULL,
+          entry_type TEXT NOT NULL DEFAULT 'apply',
+          ref_ticket_no TEXT
         );
+        CREATE INDEX IF NOT EXISTS idx_price_history_sku ON price_history(sku_code, id);
+        CREATE TABLE IF NOT EXISTS ticket_voids (
+          id INTEGER PRIMARY KEY,
+          ticket_id INTEGER NOT NULL,
+          ticket_no TEXT NOT NULL,
+          status_before TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          apply_batch_id INTEGER,
+          rolled_back_lines INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_ticket_voids_ticket ON ticket_voids(ticket_id, id);
         CREATE TABLE IF NOT EXISTS sales_fixture (
           id INTEGER PRIMARY KEY,
           sale_no TEXT NOT NULL UNIQUE,
@@ -89,10 +106,38 @@ def init_schema(conn) -> None:
     )
 
 
+def _columns(conn, table: str) -> set[str]:
+    return {r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+
+
+def _migrate(conn) -> None:
+    """Bring older databases up to the current schema (additive only; history rows never deleted)."""
+    ticket_cols = _columns(conn, "price_tickets")
+    if "voided_at" not in ticket_cols:
+        conn.execute("ALTER TABLE price_tickets ADD COLUMN voided_at TEXT")
+    if "void_reason" not in ticket_cols:
+        conn.execute("ALTER TABLE price_tickets ADD COLUMN void_reason TEXT")
+    if "void_count" not in ticket_cols:
+        conn.execute("ALTER TABLE price_tickets ADD COLUMN void_count INTEGER NOT NULL DEFAULT 0")
+
+    history_cols = _columns(conn, "price_history")
+    if "entry_type" not in history_cols:
+        conn.execute("ALTER TABLE price_history ADD COLUMN entry_type TEXT NOT NULL DEFAULT 'apply'")
+    if "ref_ticket_no" not in history_cols:
+        conn.execute("ALTER TABLE price_history ADD COLUMN ref_ticket_no TEXT")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_price_history_sku ON price_history(sku_code, id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ticket_voids_ticket ON ticket_voids(ticket_id, id)"
+    )
+
+
 def seed_if_empty() -> None:
     conn = connect()
     try:
         init_schema(conn)
+        _migrate(conn)
         n = conn.execute("SELECT COUNT(*) c FROM skus").fetchone()["c"]
         if n:
             conn.commit()

@@ -29,6 +29,7 @@ def get_ticket(ticket_id: int) -> dict[str, Any]:
         if not t:
             raise HTTPException(404, "改价单不存在")
         t["lines"] = ticket_repo.list_lines(conn, ticket_id)
+        t["voids"] = ticket_repo.list_voids(conn, ticket_id)
         return t
     finally:
         conn.close()

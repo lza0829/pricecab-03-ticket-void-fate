@@ -44,16 +44,21 @@ onMounted(async () => {
   </div>
 
   <div class="panel">
-    <h2>价格历史</h2>
+    <h2>价格历史（只追加只读审计，不删除任何行）</h2>
     <table>
       <thead>
-        <tr><th>SKU</th><th>价格</th><th>来源单</th><th>生效时刻</th><th>记录时间</th></tr>
+        <tr><th>SKU</th><th>价格</th><th>类型</th><th>来源单 / 关联单</th><th>生效时刻</th><th>记录时间</th></tr>
       </thead>
       <tbody>
         <tr v-for="h in history" :key="h.id">
           <td>{{ h.sku_code }}</td>
           <td>{{ h.price }}</td>
-          <td>{{ h.source_ticket_no || '初始' }}</td>
+          <td>
+            <span class="tag" :class="h.entry_type === 'rollback' ? 'voided' : 'ok'">
+              {{ h.entry_type === 'rollback' ? '作废回退' : '应用' }}
+            </span>
+          </td>
+          <td>{{ h.source_ticket_no || '初始' }}<template v-if="h.entry_type === 'rollback'">（回退自 {{ h.ref_ticket_no }}）</template></td>
           <td>{{ h.effective_at }}</td>
           <td>{{ h.recorded_at }}</td>
         </tr>

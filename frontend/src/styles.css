@@ -200,6 +200,22 @@ button, input, select, textarea {
   background: var(--accent-2);
   color: #1a1a08;
 }
+.btn.danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  padding: 6px 12px;
+  font-weight: 600;
+}
+.btn.danger:hover {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+}
+.tag.voided { color: #1a0a0e; background: var(--danger); border-color: var(--danger); }
 
 table {
   width: 100%;
